@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tabata Timer</title>
+    <meta name="description" content="Tabata style interval timer with sound effects">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon-192.png" sizes="192x192">
+    <link rel="icon" type="image/png" href="icon-512.png" sizes="512x512">
+    <link rel="apple-touch-icon" href="icon-512.png">
+    <title>Tabata Timer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px 30px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .timer-display {
+            font-size: 5em;
+            font-weight: bold;
+            color: #333;
+            margin: 20px 0;
+            transition: color 0.3s ease;
+        }
+
+        .timer-display.work {
+            color: #4CAF50;
+        }
+
+        .timer-display.rest {
+            color: #FF9800;
+        }
+
+        .timer-display.complete {
+            color: #9C27B0;
+        }
+
+        .phase-display {
+            font-size: 1.5em;
+            color: #666;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .round-display {
+            font-size: 1.2em;
+            color: #999;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.1s linear;
+            border-radius: 5px;
+        }
+
+        .progress-fill.work {
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+        }
+
+        .progress-fill.rest {
+            background: linear-gradient(90deg, #FF9800, #FFB74D);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .settings {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .setting-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .setting-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .setting-input {
+            width: 80px;
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+            text-align: center;
+        }
+
+        .setting-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #9C27B0;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7B1FA2;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .sound-toggle {
+            margin-top: 20px;
+        }
+
+        .toggle-btn {
+            background: #f0f0f0;
+            border: 2px solid #ddd;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-btn.active {
+            background: #4CAF50;
+            border-color: #4CAF50;
+            color: white;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            .timer-display {
+                font-size: 3.5em;
+            }
+
+            .setting-row {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .setting-input {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⏱️ Tabata Timer</h1>
+
+        <div class="settings">
+            <div class="setting-row">
+                <span class="setting-label">工作時間 (秒)</span>
+                <input type="number" id="workTime" class="setting-input" value="30" min="5" max="300" />
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">休息時間 (秒)</span>
+                <input type="number" id="restTime" class="setting-input" value="10" min="5" max="120" />
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">重複次數</span>
+                <input type="number" id="rounds" class="setting-input" value="8" min="1" max="20" />
+            </div>
+        </div>
+
+        <div class="phase-display" id="phaseDisplay">準備開始</div>
+        <div class="round-display" id="roundDisplay">第 0 / 0 回合</div>
+
+        <div class="timer-display" id="timerDisplay">00:00</div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" id="startBtn">開始</button>
+            <button class="btn btn-secondary" id="pauseBtn" disabled>暫停</button>
+            <button class="btn btn-secondary" id="resetBtn">重置</button>
+        </div>
+
+        <div class="sound-toggle">
+            <button class="toggle-btn active" id="soundToggle">🔊 音效開啟</button>
+        </div>
+    </div>
+
+    <script>
+        // Timer State
+        let state = {
+            isRunning: false,
+            isPaused: false,
+            currentRound: 0,
+            phase: 'ready', // ready, work, rest, complete
+            timeLeft: 0,
+            totalTime: 0,
+            interval: null,
+            soundEnabled: true
+        };
+
+        // Audio Context for sound effects
+        let audioContext = null;
+
+        // DOM Elements
+        const timerDisplay = document.getElementById('timerDisplay');
+        const phaseDisplay = document.getElementById('phaseDisplay');
+        const roundDisplay = document.getElementById('roundDisplay');
+        const progressFill = document.getElementById('progressFill');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const soundToggle = document.getElementById('soundToggle');
+        const workTimeInput = document.getElementById('workTime');
+        const restTimeInput = document.getElementById('restTime');
+        const roundsInput = document.getElementById('rounds');
+
+        // Initialize Audio Context
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Play sound effect
+        function playSound(type) {
+            if (!state.soundEnabled || !audioContext) return;
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            switch(type) {
+                case 'start':
+                    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    oscillator.start();
+                    oscillator.stop(audioContext.currentTime + 0.3);
+                    break;
+                case 'rest':
+                    oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    oscillator.start();
+                    oscillator.stop(audioContext.currentTime + 0.5);
+                    break;
+                case 'work':
+                    oscillator.frequency.setValueAtTime(660, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.25, audioContext.currentTime);
+                    oscillator.start();
+                    oscillator.stop(audioContext.currentTime + 0.4);
+                    break;
+                case 'complete':
+                    // Play completion melody
+                    playMelody([523, 659, 784, 1047], 0.2);
+                    return;
+            }
+        }
+
+        // Play a melody sequence
+        function playMelody(frequencies, duration) {
+            const now = audioContext.currentTime;
+            frequencies.forEach((freq, i) => {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.setValueAtTime(freq, now + i * duration);
+                gainNode.gain.setValueAtTime(0.3, now + i * duration);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + i * duration + duration * 0.8);
+
+                oscillator.start(now + i * duration);
+                oscillator.stop(now + i * duration + duration);
+            });
+        }
+
+        // Format time as MM:SS
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Update display
+        function updateDisplay() {
+            timerDisplay.textContent = formatTime(state.timeLeft);
+
+            // Update progress
+            const progress = ((state.totalTime - state.timeLeft) / state.totalTime) * 100;
+            progressFill.style.width = `${progress}%`;
+
+            // Update phase display
+            timerDisplay.className = `timer-display ${state.phase}`;
+
+            if (state.phase === 'work') {
+                phaseDisplay.textContent = '🏋️ 工作時間';
+                progressFill.className = 'progress-fill work';
+            } else if (state.phase === 'rest') {
+                phaseDisplay.textContent = '😴 休息時間';
+                progressFill.className = 'progress-fill rest';
+            } else if (state.phase === 'complete') {
+                phaseDisplay.textContent = '🎉 完成！';
+                progressFill.className = 'progress-fill';
+            } else {
+                phaseDisplay.textContent = '準備開始';
+                progressFill.className = 'progress-fill';
+            }
+
+            // Update round display
+            const totalRounds = parseInt(roundsInput.value);
+            roundDisplay.textContent = `第 ${state.currentRound} / ${totalRounds} 回合`;
+        }
+
+        // Start timer
+        function startTimer() {
+            initAudio();
+
+            if (state.isPaused) {
+                state.isPaused = false;
+            } else {
+                // New timer
+                state.currentRound = 1;
+                state.phase = 'work';
+                state.timeLeft = parseInt(workTimeInput.value);
+                state.totalTime = state.timeLeft;
+                playSound('start');
+            }
+
+            state.isRunning = true;
+            updateButtons();
+
+            // Start interval
+            state.interval = setInterval(() => {
+                state.timeLeft -= 0.1;
+
+                if (state.timeLeft <= 0) {
+                    handlePhaseComplete();
+                }
+
+                updateDisplay();
+            }, 100);
+        }
+
+        // Handle phase completion
+        function handlePhaseComplete() {
+            clearInterval(state.interval);
+
+            const totalRounds = parseInt(roundsInput.value);
+
+            if (state.phase === 'work') {
+                // Work complete, go to rest
+                if (state.currentRound >= totalRounds) {
+                    // All rounds complete
+                    state.phase = 'complete';
+                    playSound('complete');
+                    state.isRunning = false;
+                    updateButtons();
+                    updateDisplay();
+                    return;
+                }
+
+                state.phase = 'rest';
+                state.timeLeft = parseInt(restTimeInput.value);
+                state.totalTime = state.timeLeft;
+                playSound('rest');
+
+                state.interval = setInterval(() => {
+                    state.timeLeft -= 0.1;
+
+                    if (state.timeLeft <= 0) {
+                        handlePhaseComplete();
+                    }
+
+                    updateDisplay();
+                }, 100);
+
+            } else if (state.phase === 'rest') {
+                // Rest complete, go to work
+                state.phase = 'work';
+                state.currentRound++;
+                state.timeLeft = parseInt(workTimeInput.value);
+                state.totalTime = state.timeLeft;
+                playSound('work');
+
+                state.interval = setInterval(() => {
+                    state.timeLeft -= 0.1;
+
+                    if (state.timeLeft <= 0) {
+                        handlePhaseComplete();
+                    }
+
+                    updateDisplay();
+                }, 100);
+            }
+        }
+
+        // Pause timer
+        function pauseTimer() {
+            if (!state.isRunning) return;
+
+            clearInterval(state.interval);
+            state.isPaused = true;
+            state.isRunning = false;
+            phaseDisplay.textContent = '⏸️ 暫停';
+            updateButtons();
+        }
+
+        // Reset timer
+        function resetTimer() {
+            clearInterval(state.interval);
+            state = {
+                isRunning: false,
+                isPaused: false,
+                currentRound: 0,
+                phase: 'ready',
+                timeLeft: 0,
+                totalTime: 0,
+                interval: null,
+                soundEnabled: state.soundEnabled
+            };
+            updateDisplay();
+            updateButtons();
+        }
+
+        // Toggle sound
+        function toggleSound() {
+            state.soundEnabled = !state.soundEnabled;
+            soundToggle.textContent = state.soundEnabled ? '🔊 音效開啟' : '🔇 音效關閉';
+            soundToggle.classList.toggle('active', state.soundEnabled);
+        }
+
+        // Update buttons
+        function updateButtons() {
+            startBtn.disabled = state.isRunning;
+            pauseBtn.disabled = !state.isRunning;
+        }
+
+        // Event listeners
+        startBtn.addEventListener('click', startTimer);
+        pauseBtn.addEventListener('click', pauseTimer);
+        resetBtn.addEventListener('click', resetTimer);
+        soundToggle.addEventListener('click', toggleSound);
+
+        // Initial display
+        updateDisplay();
+    </script>
+</body>
+</html>
