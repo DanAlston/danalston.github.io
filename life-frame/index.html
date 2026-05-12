@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Life Frame Album Builder</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="Album settings">
+        <div class="brand">
+          <span class="brand-mark">LF</span>
+          <div>
+            <h1>Life Frame</h1>
+            <p>Album Builder</p>
+          </div>
+        </div>
+
+        <section class="panel">
+          <h2>相簿</h2>
+          <div class="segmented" role="group" aria-label="Album type">
+            <button class="segment is-active" data-type="baby">BB</button>
+            <button class="segment" data-type="wedding">Wedding</button>
+            <button class="segment" data-type="travel">Travel</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>尺寸</h2>
+          <div class="option-grid option-grid-compact" id="sizeOptions"></div>
+        </section>
+
+        <section class="panel">
+          <h2>風格</h2>
+          <div class="option-grid" id="styleOptions"></div>
+        </section>
+
+        <section class="panel">
+          <h2>文字</h2>
+          <label class="field">
+            <span>主角 / 新人</span>
+            <input id="albumTitle" type="text" value="Chloe" />
+          </label>
+          <label class="field">
+            <span>日期</span>
+            <input id="albumDate" type="text" value="13 May 2026" />
+          </label>
+          <label class="field">
+            <span>地點 / 備註</span>
+            <input id="albumNote" type="text" value="Hong Kong" />
+          </label>
+          <label class="field">
+            <span>頁面 caption</span>
+            <textarea id="pageCaption" rows="4"></textarea>
+          </label>
+        </section>
+
+        <section class="panel">
+          <h2>Slot Editor</h2>
+          <p class="helper-text" id="slotHint">Select a photo slot to adjust crop.</p>
+          <div class="range-stack">
+            <label class="range-field">
+              <span>Zoom</span>
+              <input id="cropZoom" type="range" min="1" max="2.5" step="0.05" value="1" disabled />
+            </label>
+            <label class="range-field">
+              <span>Move X</span>
+              <input id="cropX" type="range" min="-45" max="45" step="1" value="0" disabled />
+            </label>
+            <label class="range-field">
+              <span>Move Y</span>
+              <input id="cropY" type="range" min="-45" max="45" step="1" value="0" disabled />
+            </label>
+          </div>
+          <div class="button-row">
+            <button class="button" id="resetSlot" disabled>Reset</button>
+            <button class="button" id="removeSlot" disabled>Remove</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Project</h2>
+          <div class="button-row">
+            <button class="button" id="saveProject">Save JSON</button>
+            <label class="file-button file-button-light">
+              <input id="projectInput" type="file" accept="application/json,.json" />
+              Load JSON
+            </label>
+          </div>
+          <p class="status-text" id="projectStatus" role="status"></p>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <header class="toolbar">
+          <div class="toolbar-left">
+            <button class="icon-button" id="prevPage" aria-label="Previous page" title="Previous page">‹</button>
+            <div class="page-status">
+              <strong id="pageTitle">Cover</strong>
+              <span id="pageCount">1 / 5</span>
+            </div>
+            <button class="icon-button" id="nextPage" aria-label="Next page" title="Next page">›</button>
+          </div>
+          <div class="toolbar-actions">
+            <label class="file-button">
+              <input id="photoInput" type="file" accept="image/*" multiple />
+              <span>＋</span>
+              Upload
+            </label>
+            <button class="button" id="shufflePhotos">Shuffle</button>
+            <button class="button button-primary" id="printAlbum">Print / PDF</button>
+          </div>
+        </header>
+
+        <div class="editor-grid">
+          <nav class="page-strip" id="pageStrip" aria-label="Album pages"></nav>
+
+          <section class="canvas-zone" aria-label="Album preview">
+            <div class="album-page" id="albumPage"></div>
+          </section>
+
+          <aside class="asset-drawer" aria-label="Photo library">
+            <div class="drawer-header">
+              <h2>相片庫</h2>
+              <span id="photoCount">0 photos</span>
+            </div>
+            <div class="photo-library" id="photoLibrary"></div>
+          </aside>
+        </div>
+      </section>
+    </main>
+    <div class="print-stack" id="printStack" aria-hidden="true"></div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
