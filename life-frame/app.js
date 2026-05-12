@@ -141,6 +141,7 @@ let state = {
   activeSlotKey: "",
   selectedPhotoId: "",
   captions: albumTypes.baby.pages.map((page) => page.subtitle),
+  aiInsights: [],
 };
 
 const typeButtons = document.querySelectorAll("[data-type]");
@@ -167,6 +168,10 @@ const removeSlot = document.querySelector("#removeSlot");
 const saveProject = document.querySelector("#saveProject");
 const projectInput = document.querySelector("#projectInput");
 const projectStatus = document.querySelector("#projectStatus");
+const analyzePhotos = document.querySelector("#analyzePhotos");
+const autoArrange = document.querySelector("#autoArrange");
+const suggestCaptions = document.querySelector("#suggestCaptions");
+const aiResults = document.querySelector("#aiResults");
 
 function currentAlbum() {
   return albumTypes[state.type];
@@ -347,6 +352,41 @@ function renderSlotControls() {
   cropY.value = String(crop.y);
 }
 
+function renderAiResults() {
+  if (!state.aiInsights.length) {
+    aiResults.innerHTML = `
+      <div class="ai-card">
+        <strong>Ready</strong>
+        <p>Run Analyze to classify photos by orientation, estimated subject, and layout priority.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const categoryCounts = state.aiInsights.reduce((counts, item) => {
+    counts[item.category] = (counts[item.category] || 0) + 1;
+    return counts;
+  }, {});
+  const chips = Object.entries(categoryCounts)
+    .map(([category, count]) => `<span class="ai-chip">${category}: ${count}</span>`)
+    .join("");
+  const top = state.aiInsights
+    .slice(0, 3)
+    .map((item) => `${item.label} (${item.orientation})`)
+    .join(", ");
+
+  aiResults.innerHTML = `
+    <div class="ai-card">
+      <strong>${state.aiInsights.length} photos analyzed</strong>
+      <div class="ai-chip-row">${chips}</div>
+    </div>
+    <div class="ai-card">
+      <strong>Recommended hero photos</strong>
+      <p>${top}</p>
+    </div>
+  `;
+}
+
 function renderAll() {
   renderTypeControls();
   renderSizeOptions();
@@ -356,6 +396,7 @@ function renderAll() {
   renderPrintStack();
   renderPhotoLibrary();
   renderSlotControls();
+  renderAiResults();
 }
 
 typeButtons.forEach((button) => {
@@ -368,6 +409,7 @@ typeButtons.forEach((button) => {
     state.activeSlotKey = "";
     state.selectedPhotoId = "";
     state.captions = currentAlbum().pages.map((page) => page.subtitle);
+    state.aiInsights = [];
     if (state.photos.every((photo) => photo.sample)) {
       state.photos = makeSamplePhotos(state.type);
     }
@@ -524,6 +566,12 @@ removeSlot.addEventListener("click", () => {
   renderAll();
 });
 
+analyzePhotos.addEventListener("click", analyzeCurrentPhotos);
+
+autoArrange.addEventListener("click", arrangeAlbumFromInsights);
+
+suggestCaptions.addEventListener("click", suggestPageCaptions);
+
 const imagePipeline = {
   maxEdge: 1800,
   quality: 0.82,
@@ -578,6 +626,134 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
+function classifyPhoto(photo, index) {
+  const width = photo.width || (index % 3 === 0 ? 1600 : 1200);
+  const height = photo.height || (index % 3 === 1 ? 1600 : 1000);
+  const ratio = width / height;
+  const orientation = ratio > 1.15 ? "landscape" : ratio < 0.87 ? "portrait" : "square";
+  const name = (photo.name || photo.id || "").toLowerCase();
+  const categoriesByType = {
+    baby: ["portrait", "family", "detail", "milestone"],
+    wedding: ["portrait", "ceremony", "detail", "celebration"],
+    travel: ["scenery", "food", "people", "city", "hotel"],
+  };
+  const fallback = categoriesByType[state.type] || categoriesByType.travel;
+  const keywordCategory =
+    [
+      ["food", ["food", "meal", "restaurant", "coffee", "dinner", "lunch"]],
+      ["hotel", ["hotel", "room", "stay", "lobby"]],
+      ["scenery", ["view", "mountain", "sea", "sky", "park", "temple"]],
+      ["people", ["people", "family", "group", "portrait"]],
+      ["ceremony", ["ceremony", "vow", "ring", "church"]],
+      ["celebration", ["party", "dance", "dinner", "toast"]],
+    ].find(([, words]) => words.some((word) => name.includes(word)))?.[0] || "";
+  const category = keywordCategory || fallback[index % fallback.length];
+  const sizeScore = Math.min(1, Math.max(width, height) / imagePipeline.maxEdge);
+  const balanceScore = 1 - Math.min(0.35, Math.abs(1 - ratio) / 4);
+  const score = Math.round((0.62 + sizeScore * 0.25 + balanceScore * 0.13) * 100);
+
+  return {
+    id: photo.id,
+    label: photo.name || `Photo ${index + 1}`,
+    orientation,
+    category,
+    score,
+  };
+}
+
+function analyzeCurrentPhotos() {
+  state.aiInsights = state.photos
+    .map(classifyPhoto)
+    .sort((a, b) => b.score - a.score);
+  renderAll();
+  showProjectStatus(`AI Assist analyzed ${state.aiInsights.length} photos locally.`);
+}
+
+function slotCountForLayout(layout) {
+  return {
+    cover: 1,
+    feature: 3,
+    grid: 6,
+    story: 2,
+    final: 2,
+  }[layout] || 1;
+}
+
+function arrangeAlbumFromInsights() {
+  if (!state.aiInsights.length) analyzeCurrentPhotos();
+  if (!state.aiInsights.length) return;
+
+  const ranked = [...state.aiInsights];
+  const byId = new Map(ranked.map((item) => [item.id, item]));
+  const used = new Set();
+
+  state.slotAssignments = {};
+  state.cropSettings = {};
+  state.activeSlotKey = "";
+  state.selectedPhotoId = "";
+
+  currentAlbum().pages.forEach((page, pageIndex) => {
+    const slotCount = slotCountForLayout(page.layout);
+    for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
+      const preferred = ranked.find((item) => {
+        if (used.has(item.id)) return false;
+        if (slotIndex === 0 && ["cover", "feature"].includes(page.layout)) {
+          return item.orientation !== "square";
+        }
+        if (state.type === "travel" && page.name.toLowerCase().includes("food")) return item.category === "food";
+        return true;
+      }) || ranked.find((item) => !used.has(item.id)) || ranked[(pageIndex + slotIndex) % ranked.length];
+      used.add(preferred.id);
+      state.slotAssignments[slotKey(pageIndex, slotIndex)] = preferred.id;
+
+      const info = byId.get(preferred.id);
+      if (info?.orientation === "portrait" && page.layout === "cover") {
+        state.cropSettings[slotKey(pageIndex, slotIndex)] = { zoom: 1, x: 0, y: 0 };
+      }
+    }
+  });
+
+  renderAll();
+  showProjectStatus("AI Assist filled album slots with recommended photos.");
+}
+
+function captionsForType() {
+  if (state.type === "travel") {
+    return [
+      "A journey shaped by small discoveries and favourite views.",
+      "The route, the rhythm, and the places that held the week together.",
+      "Arrival moments, first meals, and the first signs of a new city.",
+      "A day of highlights, moving from street corners to open skies.",
+      "A slower chapter, saved for the quiet details.",
+      "The frames that carry the whole trip in miniature.",
+      "Homeward bound, with the best parts still close.",
+    ];
+  }
+  if (state.type === "wedding") {
+    return [
+      "A celebration of promises, details, and everyone who gathered close.",
+      "The morning before the moment, full of texture and anticipation.",
+      "The ceremony, held in light, vows, and stillness.",
+      "Portraits of two people at the centre of the day.",
+      "Dinner, dancing, and the joy that carried into the night.",
+    ];
+  }
+  return [
+    "Little moments, softly kept for the years ahead.",
+    "The first details of a new life at home.",
+    "A month-by-month record of tiny changes and big feelings.",
+    "Family days, familiar hands, and ordinary magic.",
+    "The first celebration, bright with love and noise.",
+  ];
+}
+
+function suggestPageCaptions() {
+  const suggestions = captionsForType();
+  state.captions = currentAlbum().pages.map((page, index) => suggestions[index] || page.subtitle);
+  renderAll();
+  showProjectStatus("AI Assist drafted page captions.");
+}
+
 function projectSnapshot() {
   return {
     version: 1,
@@ -591,6 +767,7 @@ function projectSnapshot() {
     photos: state.photos,
     slotAssignments: state.slotAssignments,
     cropSettings: state.cropSettings,
+    aiInsights: state.aiInsights,
   };
 }
 
@@ -627,6 +804,7 @@ projectInput.addEventListener("change", async (event) => {
     state.photos = Array.isArray(project.photos) && project.photos.length ? project.photos : makeSamplePhotos(state.type);
     state.slotAssignments = project.slotAssignments || {};
     state.cropSettings = project.cropSettings || {};
+    state.aiInsights = Array.isArray(project.aiInsights) ? project.aiInsights : [];
     state.activeSlotKey = "";
     state.selectedPhotoId = "";
     state.captions = Array.isArray(project.captions)
@@ -671,6 +849,7 @@ photoInput.addEventListener("change", async (event) => {
     state.photos = processed.length ? processed : state.photos;
     state.slotAssignments = {};
     state.cropSettings = {};
+    state.aiInsights = [];
     state.activeSlotKey = "";
     state.selectedPhotoId = "";
     state.page = 0;

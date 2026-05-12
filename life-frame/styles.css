@@ -250,6 +250,53 @@ button {
   margin-top: 12px;
 }
 
+.full-button {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.ai-results {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ai-card {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  padding: 10px;
+}
+
+.ai-card strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.ai-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ai-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ai-chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #f7f5ef;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
 .file-button-light {
   background: #fff;
 }
