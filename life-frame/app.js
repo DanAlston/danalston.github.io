@@ -171,6 +171,8 @@ const projectStatus = document.querySelector("#projectStatus");
 const analyzePhotos = document.querySelector("#analyzePhotos");
 const autoArrange = document.querySelector("#autoArrange");
 const suggestCaptions = document.querySelector("#suggestCaptions");
+const serverAnalyze = document.querySelector("#serverAnalyze");
+const aiServerUrl = document.querySelector("#aiServerUrl");
 const aiResults = document.querySelector("#aiResults");
 
 function currentAlbum() {
@@ -572,6 +574,8 @@ autoArrange.addEventListener("click", arrangeAlbumFromInsights);
 
 suggestCaptions.addEventListener("click", suggestPageCaptions);
 
+serverAnalyze.addEventListener("click", analyzeWithServer);
+
 const imagePipeline = {
   maxEdge: 1800,
   quality: 0.82,
@@ -754,6 +758,61 @@ function suggestPageCaptions() {
   showProjectStatus("AI Assist drafted page captions.");
 }
 
+async function analyzeWithServer() {
+  const url = aiServerUrl.value.trim();
+  if (!url) {
+    showProjectStatus("Please enter an AI Server URL.", true);
+    return;
+  }
+
+  showProjectStatus("Sending photos to AI server...");
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        albumType: state.type,
+        albumTitle: albumTitle.value,
+        albumDate: albumDate.value,
+        albumNote: albumNote.value,
+        photos: state.photos.slice(0, 16).map((photo) => ({
+          id: photo.id,
+          name: photo.name || photo.id,
+          width: photo.width,
+          height: photo.height,
+          src: photo.src,
+        })),
+      }),
+    });
+
+    if (!response.ok) throw new Error(`Server returned ${response.status}`);
+    const result = await response.json();
+    if (!Array.isArray(result.photos)) throw new Error("Server response has no photos array.");
+
+    state.aiInsights = result.photos
+      .map((item, index) => ({
+        id: item.id,
+        label: state.photos.find((photo) => photo.id === item.id)?.name || item.id || `Photo ${index + 1}`,
+        orientation: item.orientation || "square",
+        category: item.category || "detail",
+        score: Math.round((Number(item.quality) || 0.75) * 100),
+        caption: item.caption || "",
+        tags: item.tags || [],
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    if (Array.isArray(result.pageCaptions) && result.pageCaptions.length) {
+      state.captions = currentAlbum().pages.map((page, index) => result.pageCaptions[index] || page.subtitle);
+    }
+
+    renderAll();
+    showProjectStatus(`Server AI analyzed ${state.aiInsights.length} photos (${result.mode || "server"}).`);
+  } catch (error) {
+    analyzeCurrentPhotos();
+    showProjectStatus(`Server AI unavailable. Used local analysis instead. ${error.message}`, true);
+  }
+}
+
 function projectSnapshot() {
   return {
     version: 1,
@@ -768,6 +827,7 @@ function projectSnapshot() {
     slotAssignments: state.slotAssignments,
     cropSettings: state.cropSettings,
     aiInsights: state.aiInsights,
+    aiServerUrl: aiServerUrl.value,
   };
 }
 
@@ -813,6 +873,7 @@ projectInput.addEventListener("change", async (event) => {
     albumTitle.value = project.albumTitle || currentAlbum().title;
     albumDate.value = project.albumDate || currentAlbum().date;
     albumNote.value = project.albumNote || currentAlbum().note;
+    aiServerUrl.value = project.aiServerUrl || aiServerUrl.value;
     projectInput.value = "";
     renderAll();
     showProjectStatus(`Loaded ${file.name}.`);

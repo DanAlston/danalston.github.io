@@ -204,6 +204,11 @@ button {
   line-height: 1.45;
 }
 
+.compact-field {
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
 .helper-text {
   margin: 0 0 12px;
   color: var(--muted);
