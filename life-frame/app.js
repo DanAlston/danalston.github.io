@@ -579,6 +579,8 @@ serverAnalyze.addEventListener("click", analyzeWithServer);
 const imagePipeline = {
   maxEdge: 1800,
   quality: 0.82,
+  aiMaxEdge: 640,
+  aiQuality: 0.68,
 };
 
 function readFileAsDataUrl(file) {
@@ -603,6 +605,24 @@ function canvasToBlob(canvas, type, quality) {
   });
 }
 
+async function renderBitmapToJpeg(bitmap, maxEdge, quality) {
+  const targetScale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * targetScale));
+  const height = Math.max(1, Math.round(bitmap.height * targetScale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { alpha: false });
+  context.drawImage(bitmap, 0, 0, width, height);
+  const blob = await canvasToBlob(canvas, "image/jpeg", quality);
+  return {
+    dataUrl: await readFileAsDataUrl(blob),
+    bytes: blob.size,
+    width,
+    height,
+  };
+}
+
 async function compressImageFile(file) {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, imagePipeline.maxEdge / Math.max(bitmap.width, bitmap.height));
@@ -613,13 +633,16 @@ async function compressImageFile(file) {
   canvas.height = height;
   const context = canvas.getContext("2d", { alpha: false });
   context.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close();
 
   const blob = await canvasToBlob(canvas, "image/jpeg", imagePipeline.quality);
+  const aiImage = await renderBitmapToJpeg(bitmap, imagePipeline.aiMaxEdge, imagePipeline.aiQuality);
+  bitmap.close();
   return {
     dataUrl: await readFileAsDataUrl(blob),
+    aiDataUrl: aiImage.dataUrl,
     originalBytes: file.size,
     compressedBytes: blob.size,
+    aiBytes: aiImage.bytes,
     width,
     height,
   };
@@ -780,7 +803,7 @@ async function analyzeWithServer() {
           name: photo.name || photo.id,
           width: photo.width,
           height: photo.height,
-          src: photo.src,
+          src: photo.aiSrc || photo.src,
         })),
       }),
     });
@@ -896,12 +919,14 @@ photoInput.addEventListener("change", async (event) => {
         return {
           id: `${file.name}-${index}-${Date.now()}`,
           src: compressed.dataUrl,
+          aiSrc: compressed.aiDataUrl,
           sample: false,
           name: file.name,
           width: compressed.width,
           height: compressed.height,
           originalBytes: compressed.originalBytes,
           compressedBytes: compressed.compressedBytes,
+          aiBytes: compressed.aiBytes,
         };
       }),
     );
